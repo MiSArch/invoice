@@ -1,0 +1,36 @@
+services:
+  invoice:
+    extends:
+      file: docker-compose-base.yaml
+      service: invoice
+    build:
+      context: .
+      dockerfile: devcontainer-dockerfile
+    ports:
+      - 8080:8080
+  invoice-db:
+    extends:
+      file: docker-compose-base.yaml
+      service: invoice-db
+  invoice-mongoexpress:
+    image: mongo-express
+    ports:
+      - 8081:8081
+    depends_on:
+      - invoice-db
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://invoice-db:27017
+  invoice-dapr:
+    extends:
+      file: docker-compose-base.yaml
+      service: invoice-dapr
+    volumes:
+      - "./.dapr/dapr-config-minimal.yaml:/config.yaml"
+      - "./.dapr/components:/components"
+  placement:
+    image: "daprio/dapr"
+    command: ["./placement", "-port", "50006"]
+    ports:
+      - 50006:50006
+volumes:
+  invoice-db-data:
