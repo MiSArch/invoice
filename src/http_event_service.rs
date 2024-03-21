@@ -5,10 +5,7 @@ use log::info;
 use mongodb::Collection;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    invoice::{Invoice, InvoiceDTO},
-    order::{Order, OrderStatus, RejectionReason},
-};
+use crate::order::{Order, OrderDTO, OrderStatus, RejectionReason};
 
 /// Data to send to Dapr in order to describe a subscription.
 #[derive(Serialize)]
@@ -41,10 +38,11 @@ pub struct Event<T> {
 
 #[derive(Debug, Deserialize)]
 pub struct DiscountValidationSucceededEventData {
+    /// Order for which the discount validation succeeded.
     order: OrderEventData,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderEventData {
     /// Order UUID.
@@ -67,7 +65,7 @@ pub struct OrderEventData {
     pub payment_information_id: Uuid,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderItemEventData {
     /// OrderItem UUID.
@@ -118,22 +116,22 @@ pub async fn on_discount_order_validation_succeeded_event(
 
     match event.topic.as_str() {
         "discount/order/validation-succeeded" => {
-            let order = Order::from(event.data.order);
+            let order = Order::from(event.data.order.clone());
+            let order_dto = OrderDTO::from((event.data.order, order.invoice.clone()));
             insert_order_in_mongodb(&state.order_collection, order.clone()).await?;
-            send_invoice_created_event(order.invoice).await?
+            send_invoice_created_event(order_dto).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
     Ok(Json(TopicEventResponse::default()))
 }
 
-/// Sends an `invoice/invoice/created` created event containing the invoice.
-async fn send_invoice_created_event(invoice: Invoice) -> Result<(), StatusCode> {
+/// Sends an `invoice/invoice/created` created event the order context with the invoice.
+async fn send_invoice_created_event(order_dto: OrderDTO) -> Result<(), StatusCode> {
     let client = reqwest::Client::new();
-    let invoice_dto = InvoiceDTO::from(invoice);
     match client
         .post("http://localhost:3500/v1.0/publish/invoice/invoice/created")
-        .json(&invoice_dto)
+        .json(&order_dto)
         .send()
         .await
     {

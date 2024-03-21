@@ -61,18 +61,16 @@ fn build_order_item_invoice_content(content: &mut String, value: &OrderEventData
     }
 }
 
+/// DTO of an invoice for an order.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-/// DTO of an invoice for an order.
 pub struct InvoiceDTO {
-    pub order_id: Uuid,
     pub content: String,
 }
 
 impl From<Invoice> for InvoiceDTO {
     fn from(value: Invoice) -> Self {
         InvoiceDTO {
-            order_id: value.order_id,
             content: value.content,
         }
     }
