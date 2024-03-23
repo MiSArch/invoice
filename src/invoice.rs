@@ -2,7 +2,7 @@ use async_graphql::SimpleObject;
 use bson::{DateTime, Uuid};
 use serde::{Deserialize, Serialize};
 
-use crate::http_event_service::OrderEventData;
+use crate::{http_event_service::OrderEventData, order::OrderDTO};
 
 /// Invoice of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
@@ -79,4 +79,18 @@ impl From<Invoice> for InvoiceDTO {
 /// Formats DateTime to readable String.
 fn format_datetime(datetime: DateTime) -> String {
     datetime.to_chrono().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+/// DTO which describes the event context on invoice creation.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvoiceCreatedDTO {
+    pub order: OrderDTO,
+    pub invoice: InvoiceDTO,
+}
+
+impl From<(OrderDTO, InvoiceDTO)> for InvoiceCreatedDTO {
+    fn from((order, invoice): (OrderDTO, InvoiceDTO)) -> Self {
+        Self { order, invoice }
+    }
 }

@@ -5,7 +5,10 @@ use log::info;
 use mongodb::Collection;
 use serde::{Deserialize, Serialize};
 
-use crate::order::{Order, OrderDTO, OrderStatus, RejectionReason};
+use crate::{
+    invoice::{InvoiceCreatedDTO, InvoiceDTO},
+    order::{Order, OrderDTO, OrderStatus, RejectionReason},
+};
 
 /// Data to send to Dapr in order to describe a subscription.
 #[derive(Serialize)]
@@ -117,9 +120,11 @@ pub async fn on_discount_order_validation_succeeded_event(
     match event.topic.as_str() {
         "discount/order/validation-succeeded" => {
             let order = Order::from(event.data.order.clone());
-            let order_dto = OrderDTO::from((event.data.order, order.invoice.clone()));
-            insert_order_in_mongodb(&state.order_collection, order.clone()).await?;
-            send_invoice_created_event(order_dto).await?
+            let order_dto = OrderDTO::from(event.data.order);
+            let invoice_dto = InvoiceDTO::from(order.invoice.clone());
+            let invoice_created_dto = InvoiceCreatedDTO::from((order_dto, invoice_dto));
+            insert_order_in_mongodb(&state.order_collection, order).await?;
+            send_invoice_created_event(invoice_created_dto).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -127,11 +132,13 @@ pub async fn on_discount_order_validation_succeeded_event(
 }
 
 /// Sends an `invoice/invoice/created` created event the order context with the invoice.
-async fn send_invoice_created_event(order_dto: OrderDTO) -> Result<(), StatusCode> {
+async fn send_invoice_created_event(
+    invoice_created_dto: InvoiceCreatedDTO,
+) -> Result<(), StatusCode> {
     let client = reqwest::Client::new();
     match client
         .post("http://localhost:3500/v1.0/publish/invoice/invoice/created")
-        .json(&order_dto)
+        .json(&invoice_created_dto)
         .send()
         .await
     {

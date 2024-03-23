@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     http_event_service::{OrderEventData, OrderItemEventData},
-    invoice::{Invoice, InvoiceDTO},
+    invoice::Invoice,
 };
 
 /// Foreign type of an order.
@@ -72,24 +72,20 @@ pub struct OrderDTO {
     pub compensatable_order_amount: u64,
     /// UUID of payment information that the order should be processed with.
     pub payment_information_id: Uuid,
-    /// Invoice of order.
-    pub invoice: InvoiceDTO,
 }
 
-impl From<(OrderEventData, Invoice)> for OrderDTO {
-    fn from((order_event_data, invoice): (OrderEventData, Invoice)) -> Self {
-        let invoice_dto = InvoiceDTO::from(invoice);
+impl From<OrderEventData> for OrderDTO {
+    fn from(value: OrderEventData) -> Self {
         Self {
-            id: order_event_data.id,
-            user_id: order_event_data.user_id,
-            created_at: order_event_data.created_at,
-            order_status: order_event_data.order_status,
-            placed_at: order_event_data.placed_at,
-            rejection_reason: order_event_data.rejection_reason,
-            order_items: order_event_data.order_items,
-            compensatable_order_amount: order_event_data.compensatable_order_amount,
-            payment_information_id: order_event_data.payment_information_id,
-            invoice: invoice_dto,
+            id: value.id,
+            user_id: value.user_id,
+            created_at: value.created_at,
+            order_status: value.order_status,
+            placed_at: value.placed_at,
+            rejection_reason: value.rejection_reason,
+            order_items: value.order_items,
+            compensatable_order_amount: value.compensatable_order_amount,
+            payment_information_id: value.payment_information_id,
         }
     }
 }
