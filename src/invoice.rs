@@ -1,8 +1,8 @@
 use async_graphql::SimpleObject;
-use bson::{DateTime, Uuid};
+use bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::{http_event_service::OrderEventData, order::OrderDTO};
+use crate::http_event_service::OrderEventData;
 
 /// Invoice of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
@@ -16,13 +16,10 @@ impl From<OrderEventData> for Invoice {
         let mut content = String::new();
         content.push_str(&format!("Invoice for Order {}\n", value.id));
         content.push_str(&format!("User UUID: {}\n", value.user_id));
-        content.push_str(&format!(
-            "Created at: {}\n",
-            format_datetime(value.created_at)
-        ));
-        if let Some(placed_at) = value.placed_at {
-            content.push_str(&format!("Placed at: {}\n", format_datetime(placed_at)));
-        }
+        let created_at_string = value.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        content.push_str(&format!("Created at: {}\n", created_at_string));
+        let placed_at_string = value.placed_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        content.push_str(&format!("Placed at: {}\n", placed_at_string));
         content.push_str(&format!("Order Status: {:?}\n", value.order_status));
         if let Some(reason) = &value.rejection_reason {
             content.push_str(&format!("Rejection Reason: {:?}\n", reason));
@@ -76,21 +73,16 @@ impl From<Invoice> for InvoiceDTO {
     }
 }
 
-/// Formats DateTime to readable String.
-fn format_datetime(datetime: DateTime) -> String {
-    datetime.to_chrono().format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
 /// DTO which describes the event context on invoice creation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InvoiceCreatedDTO {
-    pub order: OrderDTO,
+    pub order: OrderEventData,
     pub invoice: InvoiceDTO,
 }
 
-impl From<(OrderDTO, InvoiceDTO)> for InvoiceCreatedDTO {
-    fn from((order, invoice): (OrderDTO, InvoiceDTO)) -> Self {
+impl From<(OrderEventData, InvoiceDTO)> for InvoiceCreatedDTO {
+    fn from((order, invoice): (OrderEventData, InvoiceDTO)) -> Self {
         Self { order, invoice }
     }
 }

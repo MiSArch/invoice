@@ -1,13 +1,13 @@
 use async_graphql::Result;
 use axum::{debug_handler, extract::State, http::StatusCode, Json};
-use bson::{DateTime, Uuid};
+use bson::Uuid;
 use log::info;
 use mongodb::Collection;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     invoice::{InvoiceCreatedDTO, InvoiceDTO},
-    order::{Order, OrderDTO, OrderStatus, RejectionReason},
+    order::{Order, OrderStatus, RejectionReason},
 };
 
 /// Data to send to Dapr in order to describe a subscription.
@@ -45,7 +45,7 @@ pub struct DiscountValidationSucceededEventData {
     order: OrderEventData,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderEventData {
     /// Order UUID.
@@ -53,15 +53,19 @@ pub struct OrderEventData {
     /// UUID of user connected with Order.
     pub user_id: Uuid,
     /// Timestamp when Order was created.
-    pub created_at: DateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
     /// The status of the Order.
     pub order_status: OrderStatus,
     /// Timestamp of Order placement. `None` until Order is placed.
-    pub placed_at: Option<DateTime>,
+    pub placed_at: chrono::DateTime<chrono::Utc>,
     /// The rejection reason if status of the Order is `OrderStatus::Rejected`.
     pub rejection_reason: Option<RejectionReason>,
     /// OrderItems associated with the order.
     pub order_items: Vec<OrderItemEventData>,
+    /// UUID of address to where the order should be shipped to.
+    pub shipment_address_id: Uuid,
+    /// UUID of address of invoice.
+    pub invoice_address_id: Uuid,
     /// Total compensatable amount of order.
     pub compensatable_order_amount: u64,
     /// UUID of payment information that the order should be processed with.
@@ -74,7 +78,7 @@ pub struct OrderItemEventData {
     /// OrderItem UUID.
     pub id: Uuid,
     /// Timestamp when OrderItem was created.
-    pub created_at: DateTime,
+    pub created_at: chrono::DateTime<chrono::Utc>,
     /// UUID of product variant associated with OrderItem.
     pub product_variant_id: Uuid,
     /// UUID of product variant version associated with OrderItem.
@@ -120,9 +124,8 @@ pub async fn on_discount_order_validation_succeeded_event(
     match event.topic.as_str() {
         "discount/order/validation-succeeded" => {
             let order = Order::from(event.data.order.clone());
-            let order_dto = OrderDTO::from(event.data.order);
             let invoice_dto = InvoiceDTO::from(order.invoice.clone());
-            let invoice_created_dto = InvoiceCreatedDTO::from((order_dto, invoice_dto));
+            let invoice_created_dto = InvoiceCreatedDTO::from((event.data.order, invoice_dto));
             insert_order_in_mongodb(&state.order_collection, order).await?;
             send_invoice_created_event(invoice_created_dto).await?
         }
