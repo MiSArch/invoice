@@ -14,6 +14,7 @@ use axum::{
     Router, Server,
 };
 use clap::{arg, command, Parser};
+use foreign_types::VendorAddress;
 use order::Order;
 use simple_logger::SimpleLogger;
 
@@ -28,9 +29,11 @@ mod authentication;
 
 mod http_event_service;
 use http_event_service::{
-    list_topic_subscriptions, on_discount_order_validation_succeeded_event, HttpEventServiceState,
+    list_topic_subscriptions, on_discount_order_validation_succeeded_event,
+    on_vendor_address_created_event, HttpEventServiceState,
 };
 
+mod foreign_types;
 mod order;
 
 /// Builds the GraphiQL frontend.
@@ -60,6 +63,8 @@ async fn db_connection() -> Client {
 /// Adds endpoints to define pub/sub interaction with Dapr.
 async fn build_dapr_router(db_client: Database) -> Router {
     let order_collection: mongodb::Collection<Order> = db_client.collection::<Order>("orders");
+    let vendor_address_collection: mongodb::Collection<VendorAddress> =
+        db_client.collection::<VendorAddress>("vendor_address");
 
     // Define routes.
     let app = Router::new()
@@ -68,7 +73,14 @@ async fn build_dapr_router(db_client: Database) -> Router {
             "/on-discount-validation-succeded",
             post(on_discount_order_validation_succeeded_event),
         )
-        .with_state(HttpEventServiceState { order_collection });
+        .route(
+            "/on-vendor-address-creation-event",
+            post(on_vendor_address_created_event),
+        )
+        .with_state(HttpEventServiceState {
+            order_collection,
+            vendor_address_collection,
+        });
     app
 }
 

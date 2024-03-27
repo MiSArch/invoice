@@ -1,40 +1,53 @@
 use async_graphql::SimpleObject;
-use bson::Uuid;
+use bson::{DateTime, Uuid};
 use serde::{Deserialize, Serialize};
 
-use crate::http_event_service::OrderEventData;
+use crate::{foreign_types::VendorAddress, http_event_service::OrderEventData};
 
 /// Invoice of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
 pub struct Invoice {
     pub order_id: Uuid,
+    pub issued_at: DateTime,
+    pub vendor_address: VendorAddress,
     pub content: String,
 }
 
-impl From<OrderEventData> for Invoice {
-    fn from(value: OrderEventData) -> Self {
+impl From<(OrderEventData, VendorAddress)> for Invoice {
+    fn from((order_event_data, vendor_address): (OrderEventData, VendorAddress)) -> Self {
         let mut content = String::new();
-        content.push_str(&format!("Invoice for Order {}\n", value.id));
-        content.push_str(&format!("User UUID: {}\n", value.user_id));
-        let created_at_string = value.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        content.push_str(&format!("Invoice for Order {}\n", order_event_data.id));
+        content.push_str(&format!("User UUID: {}\n", order_event_data.user_id));
+        let created_at_string = order_event_data
+            .created_at
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
         content.push_str(&format!("Created at: {}\n", created_at_string));
-        let placed_at_string = value.placed_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        let placed_at_string = order_event_data
+            .placed_at
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
         content.push_str(&format!("Placed at: {}\n", placed_at_string));
-        content.push_str(&format!("Order Status: {:?}\n", value.order_status));
-        if let Some(reason) = &value.rejection_reason {
+        content.push_str(&format!(
+            "Order Status: {:?}\n",
+            order_event_data.order_status
+        ));
+        if let Some(reason) = &order_event_data.rejection_reason {
             content.push_str(&format!("Rejection Reason: {:?}\n", reason));
         }
-        build_order_item_invoice_content(&mut content, &value);
+        build_order_item_invoice_content(&mut content, &order_event_data);
         content.push_str(&format!(
             "Total Compensatable Amount: {}\n",
-            value.compensatable_order_amount
+            order_event_data.compensatable_order_amount
         ));
         content.push_str(&format!(
             "Payment Information UUID: {}\n",
-            value.payment_information_id
+            order_event_data.payment_information_id
         ));
         Invoice {
-            order_id: value.id,
+            order_id: order_event_data.id,
+            issued_at: DateTime::now(),
+            vendor_address,
             content: content,
         }
     }

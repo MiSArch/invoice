@@ -1,13 +1,15 @@
 use async_graphql::Result;
 use axum::{debug_handler, extract::State, http::StatusCode, Json};
-use bson::Uuid;
+use bson::{doc, Uuid};
 use log::info;
-use mongodb::Collection;
+use mongodb::{options::UpdateOptions, Collection};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    foreign_types::VendorAddress,
     invoice::{InvoiceCreatedDTO, InvoiceDTO},
     order::{Order, OrderStatus, RejectionReason},
+    query::query_vendor_address,
 };
 
 /// Data to send to Dapr in order to describe a subscription.
@@ -37,6 +39,12 @@ impl Default for TopicEventResponse {
 pub struct Event<T> {
     pub topic: String,
     pub data: T,
+}
+
+/// Relevant part of Dapr event.data.
+#[derive(Deserialize, Debug)]
+pub struct EventData {
+    pub id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +109,7 @@ pub struct OrderItemEventData {
 #[derive(Clone)]
 pub struct HttpEventServiceState {
     pub order_collection: Collection<Order>,
+    pub vendor_address_collection: Collection<VendorAddress>,
 }
 
 /// HTTP endpoint to list topic subsciptions.
@@ -110,7 +119,12 @@ pub async fn list_topic_subscriptions() -> Result<Json<Vec<Pubsub>>, StatusCode>
         topic: "discount/order/validation-succeeded".to_string(),
         route: "/on-discount-validation-succeded".to_string(),
     };
-    Ok(Json(vec![pubsub_order]))
+    let pubsub_vendor_address = Pubsub {
+        pubsubname: "pubsub".to_string(),
+        topic: "address/vendor-address/created".to_string(),
+        route: "/on-vendor-address-creation-event".to_string(),
+    };
+    Ok(Json(vec![pubsub_order, pubsub_vendor_address]))
 }
 
 /// HTTP endpoint to receive discount order validation succeeded events.
@@ -123,11 +137,36 @@ pub async fn on_discount_order_validation_succeeded_event(
 
     match event.topic.as_str() {
         "discount/order/validation-succeeded" => {
-            let order = Order::from(event.data.order.clone());
+            let vendor_address = query_vendor_address(&state.vendor_address_collection)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let order = Order::from((event.data.order.clone(), vendor_address));
             let invoice_dto = InvoiceDTO::from(order.invoice.clone());
             let invoice_created_dto = InvoiceCreatedDTO::from((event.data.order, invoice_dto));
             insert_order_in_mongodb(&state.order_collection, order).await?;
             send_invoice_created_event(invoice_created_dto).await?
+        }
+        _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+    Ok(Json(TopicEventResponse::default()))
+}
+
+/// HTTP endpoint to receive vendor address creation events.
+#[debug_handler(state = HttpEventServiceState)]
+pub async fn on_vendor_address_created_event(
+    State(state): State<HttpEventServiceState>,
+    Json(event): Json<Event<EventData>>,
+) -> Result<Json<TopicEventResponse>, StatusCode> {
+    info!("{:?}", event);
+
+    match event.topic.as_str() {
+        "address/vendor-address/created" => {
+            let vendor_address = VendorAddress::from(event.data);
+            create_or_update_vendor_address_in_mongodb(
+                &state.vendor_address_collection,
+                vendor_address,
+            )
+            .await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -156,6 +195,25 @@ pub async fn insert_order_in_mongodb(
     order: Order,
 ) -> Result<(), StatusCode> {
     match collection.insert_one(order, None).await {
+        Ok(_) => Ok(()),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// Create or update VendorAddress in MongoDB.
+pub async fn create_or_update_vendor_address_in_mongodb(
+    collection: &Collection<VendorAddress>,
+    vendor_address: VendorAddress,
+) -> Result<(), StatusCode> {
+    let update_options = UpdateOptions::builder().upsert(true).build();
+    match collection
+        .update_one(
+            doc! {"_id": vendor_address._id },
+            doc! {"$set": {"_id": vendor_address._id}},
+            update_options,
+        )
+        .await
+    {
         Ok(_) => Ok(()),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }

@@ -1,6 +1,6 @@
 use std::any::type_name;
 
-use crate::order::Order;
+use crate::{foreign_types::VendorAddress, order::Order};
 use async_graphql::{Context, Error, Object, Result};
 
 use bson::Uuid;
@@ -47,4 +47,11 @@ pub async fn query_object<T: for<'a> Deserialize<'a> + Unpin + Send + Sync>(
             Err(Error::new(message))
         }
     }
+}
+
+pub async fn query_vendor_address(collection: &Collection<VendorAddress>) -> Result<VendorAddress> {
+    collection
+        .find_one(None, None)
+        .await?
+        .ok_or(Error::new("Vendor address is not set locally."))
 }
