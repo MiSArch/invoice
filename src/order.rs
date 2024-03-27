@@ -6,13 +6,10 @@ use crate::{http_event_service::OrderEventData, invoice::Invoice};
 
 /// Foreign type of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
-#[graphql(unresolvable)]
+#[graphql(unresolvable = "id invoice { id }")]
 pub struct Order {
     /// UUID of the order.
     pub _id: Uuid,
-    /// UUID of user connected with Order.
-    #[graphql(skip)]
-    pub user_id: Uuid,
     /// Invoice of the order.
     pub invoice: Invoice,
 }
@@ -20,13 +17,8 @@ pub struct Order {
 impl From<OrderEventData> for Order {
     fn from(value: OrderEventData) -> Self {
         let _id = value.id;
-        let user_id = value.user_id;
         let invoice = Invoice::from(value);
-        Order {
-            _id,
-            user_id,
-            invoice,
-        }
+        Order { _id, invoice }
     }
 }
 

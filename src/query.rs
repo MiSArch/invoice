@@ -1,6 +1,6 @@
 use std::any::type_name;
 
-use crate::{authentication::authenticate_user, order::Order};
+use crate::order::Order;
 use async_graphql::{Context, Error, Object, Result};
 
 use bson::Uuid;
@@ -22,7 +22,6 @@ impl Query {
         let db_client = ctx.data::<Database>()?;
         let collection: Collection<Order> = db_client.collection::<Order>("orders");
         let order = query_object(&collection, id).await?;
-        authenticate_user(&ctx, order.user_id)?;
         Ok(order)
     }
 }
