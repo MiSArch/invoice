@@ -29,8 +29,8 @@ impl Invoice {
         order_event_data: OrderEventData,
         state: &HttpEventServiceState,
     ) -> Result<Self, Error> {
+        let _id = Uuid::new();
         let (
-            _id,
             issued_at,
             issued_at_string,
             order_item_invoice_overview,
@@ -106,7 +106,6 @@ async fn invoice_attribute_setup(
     state: &HttpEventServiceState,
 ) -> Result<
     (
-        Uuid,
         DateTime,
         String,
         String,
@@ -116,7 +115,6 @@ async fn invoice_attribute_setup(
     ),
     Error,
 > {
-    let _id = Uuid::new();
     let issued_at = DateTime::now();
     let issued_at_string = issued_at
         .to_chrono()
@@ -130,7 +128,6 @@ async fn invoice_attribute_setup(
     let vendor_address = query_vendor_address(&state.vendor_address_collection).await?;
     let user = query_object(&state.user_collection, order_event_data.user_id).await?;
     Ok((
-        _id,
         issued_at,
         issued_at_string,
         order_item_invoice_overview,
