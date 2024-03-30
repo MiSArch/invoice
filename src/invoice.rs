@@ -21,8 +21,9 @@ impl From<(OrderEventData, VendorAddress, User)> for Invoice {
     fn from(
         (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
     ) -> Self {
-        let placed_at_string = order_event_data
-            .placed_at
+        let issued_at = DateTime::now();
+        let issued_at_string = issued_at
+            .to_chrono()
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
         let order_item_invoice_overview = build_order_item_invoice_content(&order_event_data);
@@ -39,7 +40,7 @@ impl From<(OrderEventData, VendorAddress, User)> for Invoice {
 ID: {}
 Name: {}, {}
 
-### Invoice ID: {}, created at: {} 
+### Invoice ID: {}, issued at: {} 
 
 Terms and conditions: {}
 
@@ -62,14 +63,14 @@ Total compensatable amount: {}
             user.first_name,
             user.last_name,
             order_event_data.id,
-            placed_at_string,
+            issued_at_string,
             INVOICE_TERMS,
             order_item_invoice_overview,
             order_event_data.compensatable_order_amount
         );
         Invoice {
             order_id: order_event_data.id,
-            issued_at: DateTime::now(),
+            issued_at,
             content: content,
         }
     }
