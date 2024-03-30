@@ -6,10 +6,14 @@ use crate::http_event_service::{UserAddressEventData, UserEventData, VendorAddre
 
 /// Foreign type of a user.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
+#[graphql(unresolvable = "id")]
 pub struct User {
     pub _id: Uuid,
+    #[graphql(skip)]
     pub first_name: String,
+    #[graphql(skip)]
     pub last_name: String,
+    #[graphql(skip)]
     pub addresses: Vec<UserAddress>,
 }
 
@@ -26,14 +30,22 @@ impl From<UserEventData> for User {
 
 /// Foreign type of a user address.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
+#[graphql(unresolvable = "id")]
 pub struct UserAddress {
     pub _id: Uuid,
+    #[graphql(skip)]
     pub street1: String,
+    #[graphql(skip)]
     pub street2: String,
+    #[graphql(skip)]
     pub city: String,
+    #[graphql(skip)]
     pub postal_code: String,
+    #[graphql(skip)]
     pub country: String,
+    #[graphql(skip)]
     pub company_name: String,
+    #[graphql(skip)]
     pub user_id: Uuid,
 }
 
@@ -69,13 +81,20 @@ impl From<UserAddress> for Bson {
 
 /// Foreign type of a vendor address.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
+#[graphql(unresolvable = "id")]
 pub struct VendorAddress {
     pub _id: Uuid,
+    #[graphql(skip)]
     pub street1: String,
+    #[graphql(skip)]
     pub street2: String,
+    #[graphql(skip)]
     pub city: String,
+    #[graphql(skip)]
     pub postal_code: String,
+    #[graphql(skip)]
     pub country: String,
+    #[graphql(skip)]
     pub company_name: String,
 }
 

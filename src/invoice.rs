@@ -104,17 +104,7 @@ Total compensatable amount: {}
 async fn invoice_attribute_setup(
     order_event_data: &OrderEventData,
     state: &HttpEventServiceState,
-) -> Result<
-    (
-        DateTime,
-        String,
-        String,
-        UserAddress,
-        VendorAddress,
-        User,
-    ),
-    Error,
-> {
+) -> Result<(DateTime, String, String, UserAddress, VendorAddress, User), Error> {
     let issued_at = DateTime::now();
     let issued_at_string = issued_at
         .to_chrono()
