@@ -5,10 +5,9 @@ use async_graphql::{
     Schema,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use authentication::AuthorizedUserHeader;
+
 use axum::{
     extract::State,
-    http::HeaderMap,
     response::{self, IntoResponse},
     routing::{get, post},
     Router, Server,
@@ -25,7 +24,6 @@ mod invoice;
 
 mod query;
 use query::Query;
-mod authentication;
 
 mod http_event_service;
 use http_event_service::{
@@ -117,17 +115,12 @@ async fn main() -> std::io::Result<()> {
 
 /// Describes the handler for GraphQL requests.
 ///
-/// Parses the "Authenticate-User" header and writes it in the context data of the specfic request.
-/// Then executes the GraphQL schema with the request.
+/// Executes the GraphQL schema with the request.
 async fn graphql_handler(
     State(schema): State<Schema<Query, EmptyMutation, EmptySubscription>>,
-    headers: HeaderMap,
     req: GraphQLRequest,
 ) -> GraphQLResponse {
-    let mut req = req.into_inner();
-    if let Ok(authenticate_user_header) = AuthorizedUserHeader::try_from(&headers) {
-        req = req.data(authenticate_user_header);
-    }
+    let req = req.into_inner();
     schema.execute(req).await.into()
 }
 
