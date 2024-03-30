@@ -24,6 +24,7 @@ pub struct Invoice {
 }
 
 impl Invoice {
+    /// Creates a new invoice from OrderEventData and HttpEventServiceState (containing the database connections).
     pub async fn new(
         order_event_data: OrderEventData,
         state: &HttpEventServiceState,
@@ -99,7 +100,7 @@ Total compensatable amount: {}
     }
 }
 
-/// Sets up all the attributes from OrderEventData and HttpEventServiceState that are required for invoice creation.
+/// Sets up all the attributes from OrderEventData and HttpEventServiceState (containing the database connections) that are required for invoice creation.
 async fn invoice_attribute_setup(
     order_event_data: &OrderEventData,
     state: &HttpEventServiceState,
