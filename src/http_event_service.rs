@@ -177,7 +177,28 @@ pub async fn list_topic_subscriptions() -> Result<Json<Vec<Pubsub>>, StatusCode>
         topic: "address/vendor-address/created".to_string(),
         route: "/on-vendor-address-creation-event".to_string(),
     };
-    Ok(Json(vec![pubsub_order, pubsub_vendor_address]))
+    let pubsub_user = Pubsub {
+        pubsubname: "pubsub".to_string(),
+        topic: "user/user/created".to_string(),
+        route: "/on-id-creation-event".to_string(),
+    };
+    let pubsub_user_address = Pubsub {
+        pubsubname: "pubsub".to_string(),
+        topic: "address/user-address/created".to_string(),
+        route: "/on-user-address-creation-event".to_string(),
+    };
+    let pubsub_user_address_archived = Pubsub {
+        pubsubname: "pubsub".to_string(),
+        topic: "address/user-address/archived".to_string(),
+        route: "/on-user-address-archived-event".to_string(),
+    };
+    Ok(Json(vec![
+        pubsub_order,
+        pubsub_vendor_address,
+        pubsub_user,
+        pubsub_user_address,
+        pubsub_user_address_archived,
+    ]))
 }
 
 /// HTTP endpoint to receive discount order validation succeeded events.
@@ -270,7 +291,7 @@ pub async fn on_user_created_event(
 
     match event.topic.as_str() {
         "user/user/created" => {
-            create_product_variant_in_mongodb(event.data, &state.user_collection).await?
+            create_user_in_mongodb(event.data, &state.user_collection).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -360,7 +381,7 @@ pub async fn remove_user_address_in_mongodb(
 }
 
 /// Create User in MongoDB.
-async fn create_product_variant_in_mongodb(
+async fn create_user_in_mongodb(
     user_event_data: UserEventData,
     collection: &Collection<User>,
 ) -> Result<(), StatusCode> {
