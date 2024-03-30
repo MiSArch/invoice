@@ -1,6 +1,6 @@
 use std::any::type_name;
 
-use crate::{foreign_types::VendorAddress, order::Order};
+use crate::{foreign_types::VendorAddress, invoice::Invoice, order::Order};
 use async_graphql::{Context, Error, Object, Result};
 
 use bson::Uuid;
@@ -23,6 +23,19 @@ impl Query {
         let collection: Collection<Order> = db_client.collection::<Order>("orders");
         let order = query_object(&collection, id).await?;
         Ok(order)
+    }
+
+    /// Entity resolver for invoice of specific id.
+    #[graphql(entity)]
+    async fn invoice_entity_resolver<'a>(
+        &self,
+        ctx: &Context<'a>,
+        #[graphql(desc = "UUID of order to retrieve.")] id: Uuid,
+    ) -> Result<Invoice> {
+        let db_client = ctx.data::<Database>()?;
+        let collection: Collection<Order> = db_client.collection::<Order>("orders");
+        let order = query_object(&collection, id).await?;
+        Ok(order.invoice)
     }
 }
 
