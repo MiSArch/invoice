@@ -291,7 +291,7 @@ pub async fn on_user_created_event(
 
     match event.topic.as_str() {
         "user/user/created" => {
-            create_product_variant_in_mongodb(event.data, &state.user_collection).await?
+            create_user_variant_in_mongodb(event.data, &state.user_collection).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -381,7 +381,7 @@ pub async fn remove_user_address_in_mongodb(
 }
 
 /// Create User in MongoDB.
-async fn create_product_variant_in_mongodb(
+async fn create_user_variant_in_mongodb(
     user_event_data: UserEventData,
     collection: &Collection<User>,
 ) -> Result<(), StatusCode> {
