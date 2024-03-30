@@ -20,8 +20,9 @@ impl Query {
         #[graphql(desc = "UUID of order to retrieve.")] id: Uuid,
     ) -> Result<Order> {
         let db_client = ctx.data::<Database>()?;
-        let collection: Collection<Order> = db_client.collection::<Order>("orders");
-        let order = query_object(&collection, id).await?;
+        let collection: Collection<Invoice> = db_client.collection::<Invoice>("invoices");
+        let invoice = query_invoice_by_order_id(&collection, id).await?;
+        let order = Order { _id: id, invoice };
         Ok(order)
     }
 
@@ -33,9 +34,9 @@ impl Query {
         #[graphql(desc = "UUID of invoice to retrieve.")] id: Uuid,
     ) -> Result<Invoice> {
         let db_client = ctx.data::<Database>()?;
-        let collection: Collection<Order> = db_client.collection::<Order>("orders");
-        let order = query_object(&collection, id).await?;
-        Ok(order.invoice)
+        let collection: Collection<Invoice> = db_client.collection::<Invoice>("invoices");
+        let invoice = query_object(&collection, id).await?;
+        Ok(invoice)
     }
 }
 
@@ -45,6 +46,18 @@ pub async fn query_vendor_address(collection: &Collection<VendorAddress>) -> Res
         .find_one(None, None)
         .await?
         .ok_or(Error::new("Vendor address is not set locally."))
+}
+
+/// Shared function to query an invoice by an order id.
+pub async fn query_invoice_by_order_id(
+    collection: &Collection<Invoice>,
+    order_id: Uuid,
+) -> Result<Invoice> {
+    let message = format!("Invoice with order_id UUID: `{}` not found.", order_id);
+    collection
+        .find_one(doc! {"order_id": order_id }, None)
+        .await?
+        .ok_or(Error::new(message))
 }
 
 /// Shared function to query an object: T from a MongoDB collection of object: T.

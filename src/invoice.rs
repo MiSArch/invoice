@@ -12,6 +12,7 @@ static INVOICE_TERMS: &str = "This invoice is created according the the companie
 /// Invoice of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
 pub struct Invoice {
+    pub _id: Uuid,
     pub order_id: Uuid,
     pub issued_at: DateTime,
     pub content: String,
@@ -21,6 +22,7 @@ impl From<(OrderEventData, VendorAddress, User)> for Invoice {
     fn from(
         (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
     ) -> Self {
+        let _id = Uuid::new();
         let issued_at = DateTime::now();
         let issued_at_string = issued_at
             .to_chrono()
@@ -62,13 +64,14 @@ Total compensatable amount: {}
             user._id,
             user.first_name,
             user.last_name,
-            order_event_data.id,
+            _id,
             issued_at_string,
             INVOICE_TERMS,
             order_item_invoice_overview,
             order_event_data.compensatable_order_amount
         );
         Invoice {
+            _id,
             order_id: order_event_data.id,
             issued_at,
             content: content,

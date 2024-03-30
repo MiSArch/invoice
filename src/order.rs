@@ -2,11 +2,7 @@ use async_graphql::{Enum, SimpleObject};
 use bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    foreign_types::{User, VendorAddress},
-    http_event_service::OrderEventData,
-    invoice::Invoice,
-};
+use crate::invoice::Invoice;
 
 /// Foreign type of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
@@ -16,16 +12,6 @@ pub struct Order {
     pub _id: Uuid,
     /// Invoice of the order.
     pub invoice: Invoice,
-}
-
-impl From<(OrderEventData, VendorAddress, User)> for Order {
-    fn from(
-        (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
-    ) -> Self {
-        let _id = order_event_data.id;
-        let invoice = Invoice::from((order_event_data, vendor_address, user));
-        Order { _id, invoice }
-    }
 }
 
 /// Describes if Order is placed, or yet pending. An Order can be rejected during its lifetime.

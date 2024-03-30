@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     foreign_types::{User, VendorAddress},
-    invoice::{InvoiceCreatedDTO, InvoiceDTO},
-    order::{Order, OrderStatus, RejectionReason},
+    invoice::{Invoice, InvoiceCreatedDTO, InvoiceDTO},
+    order::{OrderStatus, RejectionReason},
     query::{query_object, query_vendor_address},
 };
 
@@ -130,7 +130,7 @@ pub struct OrderItemEventData {
 /// Service state containing database connections.
 #[derive(Clone)]
 pub struct HttpEventServiceState {
-    pub order_collection: Collection<Order>,
+    pub invoice_collection: Collection<Invoice>,
     pub vendor_address_collection: Collection<VendorAddress>,
     pub user_collection: Collection<User>,
 }
@@ -166,10 +166,10 @@ pub async fn on_discount_order_validation_succeeded_event(
             let user = query_object(&state.user_collection, event.data.order.user_id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let order = Order::from((event.data.order.clone(), vendor_address, user));
-            let invoice_dto = InvoiceDTO::from(order.invoice.clone());
+            let invoice = Invoice::from((event.data.order.clone(), vendor_address, user));
+            let invoice_dto = InvoiceDTO::from(invoice.clone());
             let invoice_created_dto = InvoiceCreatedDTO::from((event.data.order, invoice_dto));
-            insert_order_in_mongodb(&state.order_collection, order).await?;
+            insert_invoice_in_mongodb(&state.invoice_collection, invoice).await?;
             send_invoice_created_event(invoice_created_dto).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -232,12 +232,12 @@ async fn send_invoice_created_event(
     }
 }
 
-/// Inserts order in MongoDB.
-pub async fn insert_order_in_mongodb(
-    collection: &Collection<Order>,
-    order: Order,
+/// Inserts invoice in MongoDB.
+pub async fn insert_invoice_in_mongodb(
+    collection: &Collection<Invoice>,
+    invoice: Invoice,
 ) -> Result<(), StatusCode> {
-    match collection.insert_one(order, None).await {
+    match collection.insert_one(invoice, None).await {
         Ok(_) => Ok(()),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }

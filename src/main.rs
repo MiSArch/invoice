@@ -14,7 +14,7 @@ use axum::{
 };
 use clap::{arg, command, Parser};
 use foreign_types::{User, VendorAddress};
-use order::Order;
+use invoice::Invoice;
 use simple_logger::SimpleLogger;
 
 use log::info;
@@ -60,7 +60,8 @@ async fn db_connection() -> Client {
 ///
 /// Adds endpoints to define pub/sub interaction with Dapr.
 async fn build_dapr_router(db_client: Database) -> Router {
-    let order_collection: mongodb::Collection<Order> = db_client.collection::<Order>("orders");
+    let invoice_collection: mongodb::Collection<Invoice> =
+        db_client.collection::<Invoice>("invoices");
     let vendor_address_collection: mongodb::Collection<VendorAddress> =
         db_client.collection::<VendorAddress>("vendor_address");
     let user_collection: mongodb::Collection<User> = db_client.collection::<User>("user");
@@ -78,7 +79,7 @@ async fn build_dapr_router(db_client: Database) -> Router {
         )
         .route("/on-user-creation-event", post(on_user_created_event))
         .with_state(HttpEventServiceState {
-            order_collection,
+            invoice_collection,
             vendor_address_collection,
             user_collection,
         });
