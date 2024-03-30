@@ -27,7 +27,8 @@ use query::Query;
 
 mod http_event_service;
 use http_event_service::{
-    list_topic_subscriptions, on_discount_order_validation_succeeded_event, on_user_created_event,
+    list_topic_subscriptions, on_discount_order_validation_succeeded_event,
+    on_user_address_archived_event, on_user_address_creation_event, on_user_created_event,
     on_vendor_address_created_event, HttpEventServiceState,
 };
 
@@ -78,6 +79,14 @@ async fn build_dapr_router(db_client: Database) -> Router {
             post(on_vendor_address_created_event),
         )
         .route("/on-user-creation-event", post(on_user_created_event))
+        .route(
+            "/on-user-address-creation-event",
+            post(on_user_address_creation_event),
+        )
+        .route(
+            "/on-user-address-archived-event",
+            post(on_user_address_archived_event),
+        )
         .with_state(HttpEventServiceState {
             invoice_collection,
             vendor_address_collection,

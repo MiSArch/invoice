@@ -6,10 +6,9 @@ use mongodb::{options::UpdateOptions, Collection};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    foreign_types::{User, VendorAddress},
+    foreign_types::{User, UserAddress, VendorAddress},
     invoice::{Invoice, InvoiceCreatedDTO, InvoiceDTO},
     order::{OrderStatus, RejectionReason},
-    query::{query_object, query_vendor_address},
 };
 
 /// Data to send to Dapr in order to describe a subscription.
@@ -67,6 +66,37 @@ pub struct UserEventData {
     pub first_name: String,
     /// Last name of user.
     pub last_name: String,
+}
+
+// TODO: Optionals!
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UserAddressEventData {
+    /// Vendor address UUID.
+    pub id: Uuid,
+    /// First vendor address street field.
+    pub street1: String,
+    /// First vendor address street field.
+    pub street2: String,
+    /// Vendor city.
+    pub city: String,
+    /// Vendor postal code.
+    pub postal_code: String,
+    /// Country which vendor is located in.
+    pub country: String,
+    /// Name of vendor.
+    pub company_name: String,
+    /// User UUID.
+    pub user_id: Uuid,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UserAddressArchivedEventData {
+    /// Vendor address UUID.
+    pub id: Uuid,
+    /// User UUID.
+    pub user_id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -160,13 +190,9 @@ pub async fn on_discount_order_validation_succeeded_event(
 
     match event.topic.as_str() {
         "discount/order/validation-succeeded" => {
-            let vendor_address = query_vendor_address(&state.vendor_address_collection)
+            let invoice = Invoice::new(event.data.order.clone(), &state)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let user = query_object(&state.user_collection, event.data.order.user_id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let invoice = Invoice::from((event.data.order.clone(), vendor_address, user));
             let invoice_dto = InvoiceDTO::from(invoice.clone());
             let invoice_created_dto = InvoiceCreatedDTO::from((event.data.order, invoice_dto));
             insert_invoice_in_mongodb(&state.invoice_collection, invoice).await?;
@@ -193,6 +219,41 @@ pub async fn on_vendor_address_created_event(
                 vendor_address,
             )
             .await?
+        }
+        _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+    Ok(Json(TopicEventResponse::default()))
+}
+
+/// HTTP endpoint to receive user Address creation events.
+#[debug_handler(state = HttpEventServiceState)]
+pub async fn on_user_address_creation_event(
+    State(state): State<HttpEventServiceState>,
+    Json(event): Json<Event<UserAddressEventData>>,
+) -> Result<Json<TopicEventResponse>, StatusCode> {
+    info!("{:?}", event);
+
+    match event.topic.as_str() {
+        "address/user-address/created" => {
+            let user_address = UserAddress::from(event.data);
+            insert_user_address_in_mongodb(&state.user_collection, user_address).await?
+        }
+        _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+    Ok(Json(TopicEventResponse::default()))
+}
+
+/// HTTP endpoint to receive user Address archive events.
+#[debug_handler(state = HttpEventServiceState)]
+pub async fn on_user_address_archived_event(
+    State(state): State<HttpEventServiceState>,
+    Json(event): Json<Event<UserAddressArchivedEventData>>,
+) -> Result<Json<TopicEventResponse>, StatusCode> {
+    info!("{:?}", event);
+
+    match event.topic.as_str() {
+        "address/user-address/archived" => {
+            remove_user_address_in_mongodb(&state.user_collection, event.data).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -254,6 +315,42 @@ pub async fn create_or_update_vendor_address_in_mongodb(
             doc! {"_id": vendor_address._id },
             doc! {"$set": {"_id": vendor_address._id}},
             update_options,
+        )
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// Inserts user Address in MongoDB.
+pub async fn insert_user_address_in_mongodb(
+    collection: &Collection<User>,
+    user_address: UserAddress,
+) -> Result<(), StatusCode> {
+    match collection
+        .update_one(
+            doc! {"_id": user_address.user_id },
+            doc! {"$push": {"user_addresses": user_address }},
+            None,
+        )
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// Remove user Address in MongoDB.
+pub async fn remove_user_address_in_mongodb(
+    collection: &Collection<User>,
+    user_address_event_data: UserAddressArchivedEventData,
+) -> Result<(), StatusCode> {
+    match collection
+        .update_one(
+            doc! {"_id": user_address_event_data.user_id },
+            doc! {"$pull": {"user_addresses._id": user_address_event_data.id }},
+            None,
         )
         .await
     {

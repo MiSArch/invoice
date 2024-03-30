@@ -1,10 +1,13 @@
-use async_graphql::SimpleObject;
+use async_graphql::{Error, SimpleObject};
 use bson::{DateTime, Uuid};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    foreign_types::{User, VendorAddress},
-    http_event_service::OrderEventData,
+    foreign_types::{UserAddress, VendorAddress},
+    http_event_service::{HttpEventServiceState, OrderEventData},
+    query::{
+        project_user_to_user_address, query_object, query_user_address_user, query_vendor_address,
+    },
 };
 
 static INVOICE_TERMS: &str = "This invoice is created according the the companies terms and conditions specified on the website.";
@@ -16,12 +19,15 @@ pub struct Invoice {
     pub order_id: Uuid,
     pub issued_at: DateTime,
     pub content: String,
+    pub user_address: UserAddress,
+    pub vendor_address: VendorAddress,
 }
 
-impl From<(OrderEventData, VendorAddress, User)> for Invoice {
-    fn from(
-        (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
-    ) -> Self {
+impl Invoice {
+    pub async fn new(
+        order_event_data: OrderEventData,
+        state: &HttpEventServiceState,
+    ) -> Result<Self, Error> {
         let _id = Uuid::new();
         let issued_at = DateTime::now();
         let issued_at_string = issued_at
@@ -29,6 +35,12 @@ impl From<(OrderEventData, VendorAddress, User)> for Invoice {
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
         let order_item_invoice_overview = build_order_item_invoice_content(&order_event_data);
+        let user =
+            query_user_address_user(&state.user_collection, order_event_data.invoice_address_id)
+                .await?;
+        let user_address = project_user_to_user_address(user)?;
+        let vendor_address = query_vendor_address(&state.vendor_address_collection).await?;
+        let user = query_object(&state.user_collection, order_event_data.user_id).await?;
         let content = format!(
             r#"
 # Invoice
@@ -41,6 +53,10 @@ impl From<(OrderEventData, VendorAddress, User)> for Invoice {
 ### Customer information:
 ID: {}
 Name: {}, {}
+Address:
+{}
+{}, {}
+{}, {}
 
 ### Invoice ID: {}, issued at: {} 
 
@@ -64,18 +80,26 @@ Total compensatable amount: {}
             user._id,
             user.first_name,
             user.last_name,
+            user_address.company_name,
+            user_address.street1,
+            user_address.street2,
+            user_address.city,
+            user_address.country,
             _id,
             issued_at_string,
             INVOICE_TERMS,
             order_item_invoice_overview,
             order_event_data.compensatable_order_amount
         );
-        Invoice {
+        let invoice = Invoice {
             _id,
             order_id: order_event_data.id,
             issued_at,
             content: content,
-        }
+            user_address,
+            vendor_address,
+        };
+        Ok(invoice)
     }
 }
 
