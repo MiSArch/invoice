@@ -30,7 +30,7 @@ impl Query {
     async fn invoice_entity_resolver<'a>(
         &self,
         ctx: &Context<'a>,
-        #[graphql(desc = "UUID of order to retrieve.")] id: Uuid,
+        #[graphql(desc = "UUID of invoice to retrieve.")] id: Uuid,
     ) -> Result<Invoice> {
         let db_client = ctx.data::<Database>()?;
         let collection: Collection<Order> = db_client.collection::<Order>("orders");
