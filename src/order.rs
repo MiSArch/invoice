@@ -6,7 +6,6 @@ use crate::invoice::Invoice;
 
 /// Foreign type of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
-#[graphql(unresolvable = "id")]
 pub struct Order {
     /// UUID of the order.
     pub _id: Uuid,
