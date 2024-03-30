@@ -2,73 +2,91 @@ use async_graphql::SimpleObject;
 use bson::{DateTime, Uuid};
 use serde::{Deserialize, Serialize};
 
-use crate::{foreign_types::VendorAddress, http_event_service::OrderEventData};
+use crate::{
+    foreign_types::{User, VendorAddress},
+    http_event_service::OrderEventData,
+};
+
+static INVOICE_TERMS: &str = "This invoice is created according the the companies terms and conditions specified on the website.";
 
 /// Invoice of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
 pub struct Invoice {
     pub order_id: Uuid,
     pub issued_at: DateTime,
-    pub vendor_address: VendorAddress,
     pub content: String,
 }
 
-impl From<(OrderEventData, VendorAddress)> for Invoice {
-    fn from((order_event_data, vendor_address): (OrderEventData, VendorAddress)) -> Self {
-        let mut content = String::new();
-        content.push_str(&format!("Invoice for Order {}\n", order_event_data.id));
-        content.push_str(&format!("User UUID: {}\n", order_event_data.user_id));
-        let created_at_string = order_event_data
-            .created_at
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
-        content.push_str(&format!("Created at: {}\n", created_at_string));
+impl From<(OrderEventData, VendorAddress, User)> for Invoice {
+    fn from(
+        (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
+    ) -> Self {
         let placed_at_string = order_event_data
             .placed_at
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
-        content.push_str(&format!("Placed at: {}\n", placed_at_string));
-        content.push_str(&format!(
-            "Order Status: {:?}\n",
-            order_event_data.order_status
-        ));
-        if let Some(reason) = &order_event_data.rejection_reason {
-            content.push_str(&format!("Rejection Reason: {:?}\n", reason));
-        }
-        build_order_item_invoice_content(&mut content, &order_event_data);
-        content.push_str(&format!(
-            "Total Compensatable Amount: {}\n",
+        let order_item_invoice_overview = build_order_item_invoice_content(&order_event_data);
+        let content = format!(
+            r#"
+# Invoice
+
+### Company information:
+{}
+{}, {}
+{}, {}
+
+### Customer information:
+ID: {}
+Name: {}, {}
+
+### Invoice ID: {}, created at: {} 
+
+Terms and conditions: {}
+
+---
+
+Purchased items overview:
+
+{}
+
+---
+
+Total compensatable amount: {}
+"#,
+            vendor_address.company_name,
+            vendor_address.street1,
+            vendor_address.street2,
+            vendor_address.city,
+            vendor_address.country,
+            user._id,
+            user.first_name,
+            user.last_name,
+            order_event_data.id,
+            placed_at_string,
+            INVOICE_TERMS,
+            order_item_invoice_overview,
             order_event_data.compensatable_order_amount
-        ));
-        content.push_str(&format!(
-            "Payment Information UUID: {}\n",
-            order_event_data.payment_information_id
-        ));
+        );
         Invoice {
             order_id: order_event_data.id,
             issued_at: DateTime::now(),
-            vendor_address,
             content: content,
         }
     }
 }
 
-/// Builds the part of the invoice content which describes the order items.
-fn build_order_item_invoice_content(content: &mut String, value: &OrderEventData) {
-    content.push_str("\nOrder Items:\n");
+/// Builds the part of the invoice content which describes the order items as a markdown table.
+fn build_order_item_invoice_content(value: &OrderEventData) -> String {
+    let mut content = String::new();
+    content.push_str("| Item UUID | Product variant UUID | count | Compensatable amount |\n");
+    content.push_str("| --- | --- | --- | --- |\n");
     for item in &value.order_items {
-        content.push_str(&format!("Item UUID: {}\n", item.id));
         content.push_str(&format!(
-            "Product Variant UUID: {}\n",
-            item.product_variant_id
+            "| {} | {} | {} | {} |\n",
+            item.id, item.product_variant_id, item.count, item.compensatable_amount
         ));
-        content.push_str(&format!("Count: {}\n", item.count));
-        content.push_str(&format!(
-            "Compensatable Amount: {}\n",
-            item.compensatable_amount
-        ));
-        content.push_str("\n");
     }
+    content
 }
 
 /// DTO of an invoice for an order.

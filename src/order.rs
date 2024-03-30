@@ -2,7 +2,11 @@ use async_graphql::{Enum, SimpleObject};
 use bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::{foreign_types::VendorAddress, http_event_service::OrderEventData, invoice::Invoice};
+use crate::{
+    foreign_types::{User, VendorAddress},
+    http_event_service::OrderEventData,
+    invoice::Invoice,
+};
 
 /// Foreign type of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
@@ -14,10 +18,12 @@ pub struct Order {
     pub invoice: Invoice,
 }
 
-impl From<(OrderEventData, VendorAddress)> for Order {
-    fn from((order_event_data, vendor_address): (OrderEventData, VendorAddress)) -> Self {
+impl From<(OrderEventData, VendorAddress, User)> for Order {
+    fn from(
+        (order_event_data, vendor_address, user): (OrderEventData, VendorAddress, User),
+    ) -> Self {
         let _id = order_event_data.id;
-        let invoice = Invoice::from((order_event_data, vendor_address));
+        let invoice = Invoice::from((order_event_data, vendor_address, user));
         Order { _id, invoice }
     }
 }

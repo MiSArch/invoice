@@ -26,6 +26,14 @@ impl Query {
     }
 }
 
+/// Shared function to query the current vendor address.
+pub async fn query_vendor_address(collection: &Collection<VendorAddress>) -> Result<VendorAddress> {
+    collection
+        .find_one(None, None)
+        .await?
+        .ok_or(Error::new("Vendor address is not set locally."))
+}
+
 /// Shared function to query an object: T from a MongoDB collection of object: T.
 ///
 /// * `connection` - MongoDB database connection.
@@ -47,11 +55,4 @@ pub async fn query_object<T: for<'a> Deserialize<'a> + Unpin + Send + Sync>(
             Err(Error::new(message))
         }
     }
-}
-
-pub async fn query_vendor_address(collection: &Collection<VendorAddress>) -> Result<VendorAddress> {
-    collection
-        .find_one(None, None)
-        .await?
-        .ok_or(Error::new("Vendor address is not set locally."))
 }

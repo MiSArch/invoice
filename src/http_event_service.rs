@@ -6,10 +6,10 @@ use mongodb::{options::UpdateOptions, Collection};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    foreign_types::VendorAddress,
+    foreign_types::{User, VendorAddress},
     invoice::{InvoiceCreatedDTO, InvoiceDTO},
     order::{Order, OrderStatus, RejectionReason},
-    query::query_vendor_address,
+    query::{query_object, query_vendor_address},
 };
 
 /// Data to send to Dapr in order to describe a subscription.
@@ -41,10 +41,32 @@ pub struct Event<T> {
     pub data: T,
 }
 
-/// Relevant part of Dapr event.data.
 #[derive(Deserialize, Debug)]
-pub struct EventData {
+pub struct VendorAddressEventData {
+    /// Vendor address UUID.
     pub id: Uuid,
+    /// First vendor address street field.
+    pub street1: String,
+    /// First vendor address street field.
+    pub street2: String,
+    /// Vendor city.
+    pub city: String,
+    /// Vendor postal code.
+    pub postal_code: String,
+    /// Country which vendor is located in.
+    pub country: String,
+    /// Name of vendor.
+    pub company_name: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UserEventData {
+    /// User UUID.
+    pub id: Uuid,
+    /// First name of user.
+    pub first_name: String,
+    /// Last name of user.
+    pub last_name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,6 +132,7 @@ pub struct OrderItemEventData {
 pub struct HttpEventServiceState {
     pub order_collection: Collection<Order>,
     pub vendor_address_collection: Collection<VendorAddress>,
+    pub user_collection: Collection<User>,
 }
 
 /// HTTP endpoint to list topic subsciptions.
@@ -140,7 +163,10 @@ pub async fn on_discount_order_validation_succeeded_event(
             let vendor_address = query_vendor_address(&state.vendor_address_collection)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let order = Order::from((event.data.order.clone(), vendor_address));
+            let user = query_object(&state.user_collection, event.data.order.user_id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let order = Order::from((event.data.order.clone(), vendor_address, user));
             let invoice_dto = InvoiceDTO::from(order.invoice.clone());
             let invoice_created_dto = InvoiceCreatedDTO::from((event.data.order, invoice_dto));
             insert_order_in_mongodb(&state.order_collection, order).await?;
@@ -155,7 +181,7 @@ pub async fn on_discount_order_validation_succeeded_event(
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_vendor_address_created_event(
     State(state): State<HttpEventServiceState>,
-    Json(event): Json<Event<EventData>>,
+    Json(event): Json<Event<VendorAddressEventData>>,
 ) -> Result<Json<TopicEventResponse>, StatusCode> {
     info!("{:?}", event);
 
@@ -167,6 +193,23 @@ pub async fn on_vendor_address_created_event(
                 vendor_address,
             )
             .await?
+        }
+        _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+    Ok(Json(TopicEventResponse::default()))
+}
+
+/// HTTP endpoint to receive user creation events.
+#[debug_handler(state = HttpEventServiceState)]
+pub async fn on_user_created_event(
+    State(state): State<HttpEventServiceState>,
+    Json(event): Json<Event<UserEventData>>,
+) -> Result<Json<TopicEventResponse>, StatusCode> {
+    info!("{:?}", event);
+
+    match event.topic.as_str() {
+        "user/user/created" => {
+            create_product_variant_in_mongodb(event.data, &state.user_collection).await?
         }
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -214,6 +257,18 @@ pub async fn create_or_update_vendor_address_in_mongodb(
         )
         .await
     {
+        Ok(_) => Ok(()),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// Create User in MongoDB.
+async fn create_product_variant_in_mongodb(
+    user_event_data: UserEventData,
+    collection: &Collection<User>,
+) -> Result<(), StatusCode> {
+    let user = User::from(user_event_data);
+    match collection.insert_one(user, None).await {
         Ok(_) => Ok(()),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }

@@ -14,7 +14,7 @@ use axum::{
     Router, Server,
 };
 use clap::{arg, command, Parser};
-use foreign_types::VendorAddress;
+use foreign_types::{User, VendorAddress};
 use order::Order;
 use simple_logger::SimpleLogger;
 
@@ -29,7 +29,7 @@ mod authentication;
 
 mod http_event_service;
 use http_event_service::{
-    list_topic_subscriptions, on_discount_order_validation_succeeded_event,
+    list_topic_subscriptions, on_discount_order_validation_succeeded_event, on_user_created_event,
     on_vendor_address_created_event, HttpEventServiceState,
 };
 
@@ -65,6 +65,7 @@ async fn build_dapr_router(db_client: Database) -> Router {
     let order_collection: mongodb::Collection<Order> = db_client.collection::<Order>("orders");
     let vendor_address_collection: mongodb::Collection<VendorAddress> =
         db_client.collection::<VendorAddress>("vendor_address");
+    let user_collection: mongodb::Collection<User> = db_client.collection::<User>("user");
 
     // Define routes.
     let app = Router::new()
@@ -77,9 +78,11 @@ async fn build_dapr_router(db_client: Database) -> Router {
             "/on-vendor-address-creation-event",
             post(on_vendor_address_created_event),
         )
+        .route("/on-user-creation-event", post(on_user_created_event))
         .with_state(HttpEventServiceState {
             order_collection,
             vendor_address_collection,
+            user_collection,
         });
     app
 }
