@@ -3,7 +3,7 @@ use bson::{DateTime, Uuid};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    foreign_types::{UserAddress, VendorAddress},
+    foreign_types::{User, UserAddress, VendorAddress},
     http_event_service::{HttpEventServiceState, OrderEventData},
     query::{
         project_user_to_user_address, query_object, query_user_address_user, query_vendor_address,
@@ -28,19 +28,15 @@ impl Invoice {
         order_event_data: OrderEventData,
         state: &HttpEventServiceState,
     ) -> Result<Self, Error> {
-        let _id = Uuid::new();
-        let issued_at = DateTime::now();
-        let issued_at_string = issued_at
-            .to_chrono()
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
-        let order_item_invoice_overview = build_order_item_invoice_content(&order_event_data);
-        let user =
-            query_user_address_user(&state.user_collection, order_event_data.invoice_address_id)
-                .await?;
-        let user_address = project_user_to_user_address(user)?;
-        let vendor_address = query_vendor_address(&state.vendor_address_collection).await?;
-        let user = query_object(&state.user_collection, order_event_data.user_id).await?;
+        let (
+            _id,
+            issued_at,
+            issued_at_string,
+            order_item_invoice_overview,
+            user_address,
+            vendor_address,
+            user,
+        ) = invoice_attribute_setup(&order_event_data, state).await?;
         let content = format!(
             r#"
 # Invoice
@@ -101,6 +97,46 @@ Total compensatable amount: {}
         };
         Ok(invoice)
     }
+}
+
+/// Sets up all the attributes from OrderEventData and HttpEventServiceState that are required for invoice creation.
+async fn invoice_attribute_setup(
+    order_event_data: &OrderEventData,
+    state: &HttpEventServiceState,
+) -> Result<
+    (
+        Uuid,
+        DateTime,
+        String,
+        String,
+        UserAddress,
+        VendorAddress,
+        User,
+    ),
+    Error,
+> {
+    let _id = Uuid::new();
+    let issued_at = DateTime::now();
+    let issued_at_string = issued_at
+        .to_chrono()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let order_item_invoice_overview = build_order_item_invoice_content(order_event_data);
+    let user_address_user =
+        query_user_address_user(&state.user_collection, order_event_data.invoice_address_id)
+            .await?;
+    let user_address = project_user_to_user_address(user_address_user)?;
+    let vendor_address = query_vendor_address(&state.vendor_address_collection).await?;
+    let user = query_object(&state.user_collection, order_event_data.user_id).await?;
+    Ok((
+        _id,
+        issued_at,
+        issued_at_string,
+        order_item_invoice_overview,
+        user_address,
+        vendor_address,
+        user,
+    ))
 }
 
 /// Builds the part of the invoice content which describes the order items as a markdown table.
