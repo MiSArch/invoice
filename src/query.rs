@@ -42,6 +42,18 @@ impl Query {
         let invoice = query_object(&collection, id).await?;
         Ok(invoice)
     }
+
+    /// Query for invoice of specific id.
+    async fn invoice<'a>(
+        &self,
+        ctx: &Context<'a>,
+        #[graphql(desc = "UUID of invoice to retrieve.")] id: Uuid,
+    ) -> Result<Invoice> {
+        let db_client = ctx.data::<Database>()?;
+        let collection: Collection<Invoice> = db_client.collection::<Invoice>("invoices");
+        let invoice = query_object(&collection, id).await?;
+        Ok(invoice)
+    }
 }
 
 /// Shared function to query an address from a MongoDB collection of users.
