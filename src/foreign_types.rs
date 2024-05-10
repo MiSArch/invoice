@@ -58,7 +58,7 @@ impl From<UserAddressEventData> for UserAddress {
             city: value.city,
             postal_code: value.postal_code,
             country: value.country,
-            company_name: value.company_name,
+            company_name: value.company_name.unwrap_or("".to_string()),
             user_id: value.user_id,
         }
     }

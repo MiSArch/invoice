@@ -68,7 +68,6 @@ pub struct UserEventData {
     pub last_name: String,
 }
 
-// TODO: Optionals!
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UserAddressEventData {
@@ -85,7 +84,7 @@ pub struct UserAddressEventData {
     /// Country which vendor is located in.
     pub country: String,
     /// Name of vendor.
-    pub company_name: String,
+    pub company_name: Option<String>,
     /// User UUID.
     pub user_id: Uuid,
 }
