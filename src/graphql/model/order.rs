@@ -2,7 +2,7 @@ use async_graphql::{Enum, SimpleObject};
 use bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::invoice::Invoice;
+use super::invoice::Invoice;
 
 /// Foreign type of an order.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
@@ -13,7 +13,7 @@ pub struct Order {
     pub invoice: Invoice,
 }
 
-/// Describes if Order is placed, or yet pending. An Order can be rejected during its lifetime.
+/// Describes if order is placed, or yet pending. An order can be rejected during its lifetime.
 #[derive(Debug, Enum, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OrderStatus {
     Pending,
@@ -21,7 +21,7 @@ pub enum OrderStatus {
     Rejected,
 }
 
-/// Describes the reason why an Order was rejected, in case of rejection: `OrderStatus::Rejected`.
+/// Describes the reason why an order was rejected, in case of rejection: `OrderStatus::Rejected`.
 #[derive(Debug, Enum, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RejectionReason {
     InvalidOrderData,

@@ -5,9 +5,10 @@ use log::info;
 use mongodb::{options::UpdateOptions, Collection};
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use super::model::{invoice_created_dto::InvoiceCreatedDTO, invoice_dto::InvoiceDTO};
+use crate::graphql::model::{
     foreign_types::{User, UserAddress, VendorAddress},
-    invoice::{Invoice, InvoiceCreatedDTO, InvoiceDTO},
+    invoice::Invoice,
     order::{OrderStatus, RejectionReason},
 };
 
@@ -33,7 +34,7 @@ impl Default for TopicEventResponse {
     }
 }
 
-/// Relevant part of Dapr event wrapped in a CloudEnvelope.
+/// Relevant part of Dapr event wrapped in a cloud envelope.
 #[derive(Deserialize, Debug)]
 pub struct Event<T> {
     pub topic: String,
@@ -41,6 +42,7 @@ pub struct Event<T> {
 }
 
 #[derive(Deserialize, Debug)]
+/// Relevant part of vendor address creation event.
 pub struct VendorAddressEventData {
     /// Vendor address UUID.
     pub id: Uuid,
@@ -59,6 +61,7 @@ pub struct VendorAddressEventData {
 }
 
 #[derive(Deserialize, Debug)]
+/// Relevant part of user creation event data.
 pub struct UserEventData {
     /// User UUID.
     pub id: Uuid,
@@ -70,6 +73,7 @@ pub struct UserEventData {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+/// Relevant part of user address creation event.
 pub struct UserAddressEventData {
     /// Vendor address UUID.
     pub id: Uuid,
@@ -91,6 +95,7 @@ pub struct UserAddressEventData {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+/// Relevant part of user address archive event.
 pub struct UserAddressArchivedEventData {
     /// Vendor address UUID.
     pub id: Uuid,
@@ -99,6 +104,7 @@ pub struct UserAddressArchivedEventData {
 }
 
 #[derive(Debug, Deserialize)]
+/// Relevant part of discount validation succeded event.
 pub struct DiscountValidationSucceededEventData {
     /// Order for which the discount validation succeeded.
     order: OrderEventData,
@@ -106,18 +112,19 @@ pub struct DiscountValidationSucceededEventData {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Relevant part of order event data in discount validation succeded event.
 pub struct OrderEventData {
     /// Order UUID.
     pub id: Uuid,
-    /// UUID of user connected with Order.
+    /// UUID of user connected with order.
     pub user_id: Uuid,
-    /// Timestamp when Order was created.
+    /// Timestamp when order was created.
     pub created_at: chrono::DateTime<chrono::Utc>,
-    /// The status of the Order.
+    /// The status of the order.
     pub order_status: OrderStatus,
-    /// Timestamp of Order placement. `None` until Order is placed.
+    /// Timestamp of order placement. `None` until order is placed.
     pub placed_at: chrono::DateTime<chrono::Utc>,
-    /// The rejection reason if status of the Order is `OrderStatus::Rejected`.
+    /// The rejection reason if status of the order is `OrderStatus::Rejected`.
     pub rejection_reason: Option<RejectionReason>,
     /// OrderItems associated with the order.
     pub order_items: Vec<OrderItemEventData>,
@@ -137,20 +144,21 @@ pub struct OrderEventData {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Relevant part of order item event data in order event data.
 pub struct OrderItemEventData {
-    /// OrderItem UUID.
+    /// order item UUID.
     pub id: Uuid,
-    /// Timestamp when OrderItem was created.
+    /// Timestamp when order item was created.
     pub created_at: chrono::DateTime<chrono::Utc>,
-    /// UUID of product variant associated with OrderItem.
+    /// UUID of product variant associated with order item.
     pub product_variant_id: Uuid,
-    /// UUID of product variant version associated with OrderItem.
+    /// UUID of product variant version associated with order item.
     pub product_variant_version_id: Uuid,
-    /// UUID of tax rate version associated with OrderItem.
+    /// UUID of tax rate version associated with order item.
     pub tax_rate_version_id: Uuid,
-    /// UUID of shopping cart item associated with OrderItem.
+    /// UUID of shopping cart item associated with order item.
     pub shopping_cart_item_id: Uuid,
-    /// Specifies the quantity of the OrderItem.
+    /// Specifies the quantity of the order item.
     pub count: u64,
     /// Total cost of product item, which can also be refunded.
     pub compensatable_amount: u64,
@@ -162,6 +170,7 @@ pub struct OrderItemEventData {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Relevant part of payment authorization event data in order event data.
 pub enum PaymentAuthorizationEventData {
     /// CVC/CVV number of 3-4 digits.
     CVC(u16),
@@ -212,6 +221,9 @@ pub async fn list_topic_subscriptions() -> Result<Json<Vec<Pubsub>>, StatusCode>
 }
 
 /// HTTP endpoint to receive discount order validation succeeded events.
+///
+/// * `state` - Service state containing database connections.
+/// * `event` - Event handled by endpoint.
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_discount_order_validation_succeeded_event(
     State(state): State<HttpEventServiceState>,
@@ -235,6 +247,9 @@ pub async fn on_discount_order_validation_succeeded_event(
 }
 
 /// HTTP endpoint to receive vendor address creation events.
+///
+/// * `state` - Service state containing database connections.
+/// * `event` - Event handled by endpoint.
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_vendor_address_created_event(
     State(state): State<HttpEventServiceState>,
@@ -256,7 +271,10 @@ pub async fn on_vendor_address_created_event(
     Ok(Json(TopicEventResponse::default()))
 }
 
-/// HTTP endpoint to receive user Address creation events.
+/// HTTP endpoint to receive user address creation events.
+///
+/// * `state` - Service state containing database connections.
+/// * `event` - Event handled by endpoint.
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_user_address_creation_event(
     State(state): State<HttpEventServiceState>,
@@ -274,7 +292,10 @@ pub async fn on_user_address_creation_event(
     Ok(Json(TopicEventResponse::default()))
 }
 
-/// HTTP endpoint to receive user Address archive events.
+/// HTTP endpoint to receive user address archive events.
+///
+/// * `state` - Service state containing database connections.
+/// * `event` - Event handled by endpoint.
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_user_address_archived_event(
     State(state): State<HttpEventServiceState>,
@@ -292,6 +313,9 @@ pub async fn on_user_address_archived_event(
 }
 
 /// HTTP endpoint to receive user creation events.
+///
+/// * `state` - Service state containing database connections.
+/// * `event` - Event handled by endpoint.
 #[debug_handler(state = HttpEventServiceState)]
 pub async fn on_user_created_event(
     State(state): State<HttpEventServiceState>,
@@ -300,13 +324,15 @@ pub async fn on_user_created_event(
     info!("{:?}", event);
 
     match event.topic.as_str() {
-        "user/user/created" => create_user_in_mongodb(event.data, &state.user_collection).await?,
+        "user/user/created" => add_user_to_mongodb(event.data, &state.user_collection).await?,
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
     Ok(Json(TopicEventResponse::default()))
 }
 
-/// Sends an `invoice/invoice/created` created event the order context with the invoice.
+/// Sends an `invoice/invoice/created` event the order context with the invoice.
+///
+/// * `invoice_created_dto` - Invoice created DTO to send in `invoice/invoice/created` event.
 async fn send_invoice_created_event(
     invoice_created_dto: InvoiceCreatedDTO,
 ) -> Result<(), StatusCode> {
@@ -323,6 +349,9 @@ async fn send_invoice_created_event(
 }
 
 /// Inserts invoice in MongoDB.
+///
+/// * `collection` - MongoDB collection to add newly created invoice to.
+/// * `invoice` - Invoice to insert.
 pub async fn insert_invoice_in_mongodb(
     collection: &Collection<Invoice>,
     invoice: Invoice,
@@ -333,7 +362,10 @@ pub async fn insert_invoice_in_mongodb(
     }
 }
 
-/// Create or update VendorAddress in MongoDB.
+/// Create or update vendor address in MongoDB.
+///
+/// * `collection` - MongoDB collection to create or update vendor address in.
+/// * `vendor_address` - Vendor address to create or update.
 pub async fn create_or_update_vendor_address_in_mongodb(
     collection: &Collection<VendorAddress>,
     vendor_address: VendorAddress,
@@ -352,7 +384,10 @@ pub async fn create_or_update_vendor_address_in_mongodb(
     }
 }
 
-/// Inserts user Address in MongoDB.
+/// Inserts user address in MongoDB.
+///
+/// * `collection` - MongoDB collection to add user address to.
+/// * `user_address` - User address to insert.
 pub async fn insert_user_address_in_mongodb(
     collection: &Collection<User>,
     user_address: UserAddress,
@@ -370,7 +405,10 @@ pub async fn insert_user_address_in_mongodb(
     }
 }
 
-/// Remove user Address in MongoDB.
+/// Remove user address in MongoDB.
+///
+/// * `collection` - MongoDB collection to remove user address from.
+/// * `user_address` - User address to remove.
 pub async fn remove_user_address_in_mongodb(
     collection: &Collection<User>,
     user_address_event_data: UserAddressArchivedEventData,
@@ -388,8 +426,11 @@ pub async fn remove_user_address_in_mongodb(
     }
 }
 
-/// Create User in MongoDB.
-async fn create_user_in_mongodb(
+/// Add user to MongoDB.
+///
+/// * `collection` - MongoDB collection to add user to.
+/// * `user_event_data` - User event data containing the user to add.
+async fn add_user_to_mongodb(
     user_event_data: UserEventData,
     collection: &Collection<User>,
 ) -> Result<(), StatusCode> {

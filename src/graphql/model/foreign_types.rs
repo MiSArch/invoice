@@ -2,7 +2,9 @@ use async_graphql::SimpleObject;
 use bson::{doc, Bson, Uuid};
 use serde::{Deserialize, Serialize};
 
-use crate::http_event_service::{UserAddressEventData, UserEventData, VendorAddressEventData};
+use crate::event::http_event_service::{
+    UserAddressEventData, UserEventData, VendorAddressEventData,
+};
 
 /// Foreign type of a user.
 #[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
