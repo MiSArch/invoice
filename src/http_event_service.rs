@@ -130,6 +130,10 @@ pub struct OrderEventData {
     pub compensatable_order_amount: u64,
     /// UUID of payment information that the order should be processed with.
     pub payment_information_id: Uuid,
+    /// Optional payment authorization information.
+    pub payment_authorization: Option<PaymentAuthorizationEventData>,
+    /// VAT number.
+    pub vat_number: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -155,6 +159,13 @@ pub struct OrderItemEventData {
     pub shipment_method_id: Uuid,
     /// UUIDs of discounts applied to order item.
     pub discount_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum PaymentAuthorizationEventData {
+    /// CVC/CVV number of 3-4 digits.
+    CVC(u16),
 }
 
 /// Service state containing database connections.
@@ -290,9 +301,7 @@ pub async fn on_user_created_event(
     info!("{:?}", event);
 
     match event.topic.as_str() {
-        "user/user/created" => {
-            create_user_in_mongodb(event.data, &state.user_collection).await?
-        }
+        "user/user/created" => create_user_in_mongodb(event.data, &state.user_collection).await?,
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
     Ok(Json(TopicEventResponse::default()))

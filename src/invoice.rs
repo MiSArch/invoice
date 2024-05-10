@@ -21,6 +21,7 @@ pub struct Invoice {
     pub content: String,
     pub user_address: UserAddress,
     pub vendor_address: VendorAddress,
+    pub vat_number: String,
 }
 
 impl Invoice {
@@ -46,6 +47,8 @@ impl Invoice {
 {}
 {}, {}
 {}, {}
+
+VAT number: {}
 
 ### Customer information:
 ID: {}
@@ -74,6 +77,7 @@ Total compensatable amount: {}
             vendor_address.street2,
             vendor_address.city,
             vendor_address.country,
+            order_event_data.vat_number,
             user._id,
             user.first_name,
             user.last_name,
@@ -95,6 +99,7 @@ Total compensatable amount: {}
             content: content,
             user_address,
             vendor_address,
+            vat_number: order_event_data.vat_number,
         };
         Ok(invoice)
     }
