@@ -21,7 +21,7 @@ pub struct Invoice {
     pub content: String,
     pub user_address: UserAddress,
     pub vendor_address: VendorAddress,
-    pub vat_number: String,
+    pub vat_number: Option<String>,
 }
 
 impl Invoice {
@@ -39,6 +39,10 @@ impl Invoice {
             vendor_address,
             user,
         ) = invoice_attribute_setup(&order_event_data, state).await?;
+        let vat_number = order_event_data
+            .vat_number
+            .clone()
+            .unwrap_or("-".to_string());
         let content = format!(
             r#"
 # Invoice
@@ -77,7 +81,7 @@ Total compensatable amount: {}
             vendor_address.street2,
             vendor_address.city,
             vendor_address.country,
-            order_event_data.vat_number,
+            vat_number,
             user._id,
             user.first_name,
             user.last_name,

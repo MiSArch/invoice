@@ -138,8 +138,8 @@ pub struct OrderEventData {
     pub payment_information_id: Uuid,
     /// Optional payment authorization information.
     pub payment_authorization: Option<PaymentAuthorizationEventData>,
-    /// VAT number.
-    pub vat_number: String,
+    /// Option VAT number.
+    pub vat_number: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
