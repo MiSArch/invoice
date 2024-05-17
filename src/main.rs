@@ -14,27 +14,23 @@ use axum::{
     Router, Server,
 };
 use clap::{arg, command, Parser};
-use foreign_types::{User, VendorAddress};
-use invoice::Invoice;
-use simple_logger::SimpleLogger;
 
-use log::info;
+use log::{info, Level};
 use mongodb::{options::ClientOptions, Client, Database};
 
-mod invoice;
+mod event;
+mod graphql;
 
-mod query;
-use query::Query;
-
-mod http_event_service;
-use http_event_service::{
+use event::http_event_service::{
     list_topic_subscriptions, on_discount_order_validation_succeeded_event,
     on_user_address_archived_event, on_user_address_creation_event, on_user_created_event,
     on_vendor_address_created_event, HttpEventServiceState,
 };
-
-mod foreign_types;
-mod order;
+use graphql::model::{
+    foreign_types::{User, VendorAddress},
+    invoice::Invoice,
+};
+use graphql::query::Query;
 
 /// Builds the GraphiQL frontend.
 async fn graphiql() -> impl IntoResponse {
@@ -108,7 +104,7 @@ struct Args {
 /// Activates logger and parses argument for optional schema generation. Otherwise starts gRPC and GraphQL server.
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    SimpleLogger::new().init().unwrap();
+    simple_logger::init_with_level(Level::Warn).unwrap();
 
     let args = Args::parse();
     if args.generate_schema {

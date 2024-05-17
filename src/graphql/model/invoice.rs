@@ -1,13 +1,13 @@
-use async_graphql::{Error, SimpleObject};
-use bson::{DateTime, Uuid};
+use async_graphql::{Error, Result, SimpleObject};
+use bson::{doc, DateTime, Uuid};
+use mongodb::{options::FindOneOptions, Collection};
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::event::http_event_service::{HttpEventServiceState, OrderEventData};
+
+use super::{
+    super::query::query_object,
     foreign_types::{User, UserAddress, VendorAddress},
-    http_event_service::{HttpEventServiceState, OrderEventData},
-    query::{
-        project_user_to_user_address, query_object, query_user_address_user, query_vendor_address,
-    },
 };
 
 static INVOICE_TERMS: &str = "This invoice is created according the the companies terms and conditions specified on the website.";
@@ -21,10 +21,11 @@ pub struct Invoice {
     pub content: String,
     pub user_address: UserAddress,
     pub vendor_address: VendorAddress,
+    pub vat_number: Option<String>,
 }
 
 impl Invoice {
-    /// Creates a new invoice from OrderEventData and HttpEventServiceState (containing the database connections).
+    /// Creates a new invoice from `OrderEventData` and `HttpEventServiceState` (containing the database connections).
     pub async fn new(
         order_event_data: OrderEventData,
         state: &HttpEventServiceState,
@@ -38,6 +39,10 @@ impl Invoice {
             vendor_address,
             user,
         ) = invoice_attribute_setup(&order_event_data, state).await?;
+        let vat_number = order_event_data
+            .vat_number
+            .clone()
+            .unwrap_or("-".to_string());
         let content = format!(
             r#"
 # Invoice
@@ -46,6 +51,8 @@ impl Invoice {
 {}
 {}, {}
 {}, {}
+
+VAT number: {}
 
 ### Customer information:
 ID: {}
@@ -74,6 +81,7 @@ Total compensatable amount: {}
             vendor_address.street2,
             vendor_address.city,
             vendor_address.country,
+            vat_number,
             user._id,
             user.first_name,
             user.last_name,
@@ -95,12 +103,13 @@ Total compensatable amount: {}
             content: content,
             user_address,
             vendor_address,
+            vat_number: order_event_data.vat_number,
         };
         Ok(invoice)
     }
 }
 
-/// Sets up all the attributes from OrderEventData and HttpEventServiceState (containing the database connections) that are required for invoice creation.
+/// Sets up all the attributes from `OrderEventData` and `HttpEventServiceState` (containing the database connections) that are required for invoice creation.
 async fn invoice_attribute_setup(
     order_event_data: &OrderEventData,
     state: &HttpEventServiceState,
@@ -141,35 +150,49 @@ fn build_order_item_invoice_content(value: &OrderEventData) -> String {
     content
 }
 
-/// DTO of an invoice for an order.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InvoiceDTO {
-    pub order_id: Uuid,
-    pub issued_at: chrono::DateTime<chrono::Utc>,
-    pub content: String,
-}
-
-impl From<Invoice> for InvoiceDTO {
-    fn from(value: Invoice) -> Self {
-        InvoiceDTO {
-            order_id: value.order_id,
-            issued_at: value.issued_at.to_chrono(),
-            content: value.content,
-        }
+/// Shared function to query an address from a MongoDB collection of users.
+/// Returns User which only contains the queried address.
+pub async fn query_user_address_user(
+    collection: &mongodb::Collection<User>,
+    address_id: Uuid,
+) -> Result<User> {
+    let find_options = FindOneOptions::builder()
+        .projection(Some(doc! {
+            "addresses.$": 1,
+            "_id": 1
+        }))
+        .build();
+    let message = format!("Address of UUID: `{}` not found.", address_id);
+    match collection
+        .find_one(
+            doc! {"addresses": {
+                "$elemMatch": {
+                    "_id": address_id
+                }
+            }},
+            Some(find_options),
+        )
+        .await
+    {
+        Ok(maybe_user) => maybe_user.ok_or(Error::new(message.clone())),
+        Err(e) => Err(e.into()),
     }
 }
 
-/// DTO which describes the event context on invoice creation.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InvoiceCreatedDTO {
-    pub order: OrderEventData,
-    pub invoice: InvoiceDTO,
+/// Projects result of user address query, which is of type `User`, to the contained user address.
+pub fn project_user_to_user_address(user: User) -> Result<UserAddress> {
+    let message = format!("Projection failed, address could not be extracted from user.");
+    user.addresses
+        .iter()
+        .next()
+        .cloned()
+        .ok_or(Error::new(message.clone()))
 }
 
-impl From<(OrderEventData, InvoiceDTO)> for InvoiceCreatedDTO {
-    fn from((order, invoice): (OrderEventData, InvoiceDTO)) -> Self {
-        Self { order, invoice }
-    }
+/// Shared function to query the current vendor address.
+pub async fn query_vendor_address(collection: &Collection<VendorAddress>) -> Result<VendorAddress> {
+    collection
+        .find_one(None, None)
+        .await?
+        .ok_or(Error::new("Vendor address is not set locally."))
 }
